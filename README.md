@@ -181,3 +181,6 @@ Le fichier `schema.sql` inclut :
 - **Python 3.x** : Langage principal
 - **SQLite 3** : Base de données embarquée
 - **sqlite3** : Driver Python natif (pas de dépendance externe)
+
+
+### README généré par IA
