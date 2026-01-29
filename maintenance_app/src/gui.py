@@ -48,7 +48,7 @@ class MaintenanceApp:
 
     def _init_database(self):
         """Initialise la base de donnees si necessaire."""
-        if not database_exists():
+        if not database_exists():   
             init_database()
 
     def _create_widgets(self):
