@@ -6,12 +6,9 @@ from tkinter import ttk, messagebox, simpledialog
 # Ajouter le répertoire src au path pour les imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from db_connection import init_database, database_exists, DatabaseConnection
-from data_access import (
-    TechnicienDAO, EquipementDAO, InterventionDAO,
-    StatistiquesDAO, IndicateursDAO
-)
-from business_logic import MaintenanceService
+from db_connection import init_database, database_exists, fermer_connexion
+import data_access
+import business_logic
 
 
 class MaintenanceApp:
@@ -254,9 +251,9 @@ class MaintenanceApp:
         """Affiche les indicateurs globaux."""
         self._clear_and_set_title("Indicateurs Globaux")
 
-        cout_total = MaintenanceService.get_cout_total_maintenance()
-        nb_interventions = MaintenanceService.get_nombre_interventions()
-        duree_moyenne = MaintenanceService.get_duree_moyenne_intervention()
+        cout_total = data_access.obtenir_cout_total()
+        nb_interventions = data_access.obtenir_nombre_interventions()
+        duree_moyenne = data_access.obtenir_duree_moyenne()
 
         self._append_text(f"""
   Cout total de maintenance     : {cout_total:,.2f} EUR
@@ -269,7 +266,7 @@ class MaintenanceApp:
         """Affiche les equipements les plus sollicites."""
         self._clear_and_set_title("Equipements les Plus Sollicites")
 
-        equipements = MaintenanceService.get_equipements_plus_sollicites(10)
+        equipements = data_access.obtenir_equipements_sollicites(10)
 
         headers = ["Equipement", "Type", "Nb Interv.", "Cout Total", "Duree (min)"]
         rows = [
@@ -286,7 +283,7 @@ class MaintenanceApp:
         """Affiche la frequence des interventions par type."""
         self._clear_and_set_title("Frequence des Interventions par Type")
 
-        frequences = MaintenanceService.get_frequence_par_type()
+        frequences = data_access.obtenir_frequence_par_type()
 
         headers = ["Type", "Nombre", "Cout Total", "Cout Moyen", "Duree Moy."]
         rows = [
@@ -303,7 +300,7 @@ class MaintenanceApp:
         """Affiche le cout par type d'equipement."""
         self._clear_and_set_title("Cout de Maintenance par Type d'Equipement")
 
-        couts = IndicateursDAO.get_cout_par_type_equipement()
+        couts = data_access.obtenir_cout_par_type_equipement()
 
         headers = ["Type Equipement", "Nb Equip.", "Nb Interv.", "Cout Total", "Cout Moy."]
         rows = [
@@ -320,7 +317,7 @@ class MaintenanceApp:
         """Affiche le taux de disponibilite."""
         self._clear_and_set_title("Taux de Disponibilite par Type (Calcul Python)")
 
-        taux = MaintenanceService.calculer_taux_disponibilite_equipements()
+        taux = business_logic.calculer_taux_disponibilite()
 
         self._append_text("\n  [Indicateur calcule cote Python, pas en SQL]\n\n")
 
@@ -334,7 +331,7 @@ class MaintenanceApp:
         """Affiche l'indice de fiabilite."""
         self._clear_and_set_title("Indice de Fiabilite des Equipements (Calcul Python)")
 
-        fiabilite = MaintenanceService.calculer_indice_fiabilite_equipements()
+        fiabilite = business_logic.calculer_indice_fiabilite()
 
         self._append_text("\n  [Indicateur calcule cote Python: score base sur pannes, couts et age]\n\n")
 
@@ -352,7 +349,7 @@ class MaintenanceApp:
         """Affiche la tendance des couts."""
         self._clear_and_set_title("Tendance des Couts 2024 (Calcul Python)")
 
-        tendance = MaintenanceService.calculer_tendance_couts(2024)
+        tendance = business_logic.calculer_tendance_couts(2024)
 
         self._append_text("\n  [Indicateur calcule cote Python: analyse semestrielle]\n")
         self._append_text(f"""
@@ -376,7 +373,7 @@ class MaintenanceApp:
         """Affiche les alertes de maintenance."""
         self._clear_and_set_title("Alertes de Maintenance (Calcul Python)")
 
-        alertes = MaintenanceService.generer_alertes_maintenance()
+        alertes = business_logic.generer_alertes()
 
         self._append_text("\n  [Alertes generees par analyse Python des donnees]\n\n")
 
@@ -398,7 +395,7 @@ class MaintenanceApp:
         """Affiche les interventions par mois."""
         self._clear_and_set_title("Interventions par Mois (2024)")
 
-        interventions = IndicateursDAO.get_interventions_par_mois(2024)
+        interventions = data_access.obtenir_interventions_par_mois(2024)
 
         noms_mois = {
             '01': 'Janvier', '02': 'Fevrier', '03': 'Mars', '04': 'Avril',
@@ -421,7 +418,7 @@ class MaintenanceApp:
         """Affiche la performance des techniciens."""
         self._clear_and_set_title("Performance des Techniciens")
 
-        perf = IndicateursDAO.get_performance_techniciens()
+        perf = data_access.obtenir_performance_techniciens()
 
         headers = ["Technicien", "Specialite", "Nb Interv.", "Temps Total", "Valeur"]
         rows = [
@@ -439,7 +436,7 @@ class MaintenanceApp:
         self._clear_and_set_title("Historique d'un Equipement")
 
         # Lister les equipements
-        equipements = EquipementDAO.get_all()
+        equipements = data_access.obtenir_tous_equipements()
 
         # Creer la liste pour le choix
         choix_list = [f"{eq['id']}. {eq['nom']} ({eq['type']})" for eq in equipements]
@@ -458,7 +455,7 @@ class MaintenanceApp:
 
         try:
             eq_id = int(choix)
-            equipement = EquipementDAO.get_by_id(eq_id)
+            equipement = data_access.obtenir_equipement_par_id(eq_id)
 
             if not equipement:
                 self._append_text("\n  Equipement non trouve.\n")
@@ -469,7 +466,7 @@ class MaintenanceApp:
             self._append_text(f"  Type: {equipement['type']} | Localisation: {equipement['localisation']}\n")
             self._append_text(f"  Statut actuel: {equipement['statut']}\n\n")
 
-            historique = IndicateursDAO.get_historique_equipement(eq_id)
+            historique = data_access.obtenir_historique_equipement(eq_id)
 
             if historique:
                 headers = ["Date", "Type", "Description", "Duree", "Cout", "Technicien"]
@@ -492,7 +489,7 @@ class MaintenanceApp:
         """Affiche le rapport de synthese complet."""
         self._clear_and_set_title("Rapport de Synthese Complet")
 
-        rapport = MaintenanceService.generer_rapport_synthese()
+        rapport = business_logic.generer_rapport_synthese()
 
         # Indicateurs globaux
         self._append_text("\n  INDICATEURS GLOBAUX\n")
@@ -536,7 +533,7 @@ class MaintenanceApp:
     def quit_app(self):
         """Ferme l'application."""
         if messagebox.askyesno("Quitter", "Voulez-vous vraiment quitter?"):
-            DatabaseConnection().close()
+            fermer_connexion()
             self.root.destroy()
 
 
