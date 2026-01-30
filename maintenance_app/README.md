@@ -28,6 +28,19 @@ Cette application permet de gérer et analyser la maintenance de 10 équipements
 
 ## 🎯 Fonctionnalités
 
+### 🆕 Gestion (CRUD - Create, Read, Update, Delete)
+- ➕ **Ajouter Intervention** : Créer une nouvelle intervention de maintenance
+- ➕ **Ajouter Technicien** : Enregistrer un nouveau technicien dans la base
+- ➕ **Ajouter Équipement** : Ajouter un nouvel équipement au parc matériel
+
+Chaque formulaire inclut :
+- Validation des données en temps réel
+- Messages d'erreur explicites
+- Contraintes d'intégrité (email unique, numéro de série unique)
+- Rollback automatique en cas d'erreur
+
+📖 **Guide détaillé** : [GUIDE_GESTION.md](GUIDE_GESTION.md)
+
 ### Analyses SQL (Niveaux 1, 2 et 3)
 - Indicateurs globaux (SUM, AVG, COUNT)
 - Équipements les plus sollicités (GROUP BY, HAVING)
@@ -52,13 +65,14 @@ maintenance_app/
 │   └── schema.sql              # Schéma + données de test
 ├── src/
 │   ├── db_connection.py        # Couche connexion
-│   ├── data_access.py          # Couche DAO (17 fonctions SQL)
+│   ├── data_access.py          # Couche DAO (20 fonctions SQL + 4 fonctions INSERT)
 │   ├── business_logic.py       # Couche métier (5 calculs Python)
 │   ├── main.py                 # Interface CLI
-│   ├── gui.py                  # Interface GUI Tkinter
+│   ├── gui.py                  # Interface GUI Tkinter (+ formulaires de saisie)
 │   ├── test_simple.py          # Tests de base
-│   ├── test_fonctionnalites.py # Tests complets
-│   └── test_gui.py             # Tests de l'interface graphique
+│   ├── test_fonctionnalites.py # Tests complets (10 tests)
+│   ├── test_gui.py             # Tests de l'interface graphique (5 tests)
+│   └── test_ajouts.py          # Tests des fonctionnalités d'ajout (4 tests)
 ├── lancer_gui.bat              # Script de lancement GUI
 ├── lancer_cli.bat              # Script de lancement CLI
 ├── GUIDE_DEMARRAGE.md          # Guide détaillé
@@ -99,9 +113,20 @@ cd src
 python test_gui.py
 ```
 
+**Test fonctionnalités d'ajout (4 tests) :**
+```bash
+cd src
+python test_ajouts.py
+```
+- Ajout de technicien
+- Ajout d'équipement
+- Ajout d'intervention
+- Validation des contraintes
+
 ## 📚 Documentation
 
 - **[GUIDE_DEMARRAGE.md](GUIDE_DEMARRAGE.md)** : Guide d'utilisation détaillé
+- **[GUIDE_GESTION.md](GUIDE_GESTION.md)** : Guide des fonctionnalités d'ajout (CRUD)
 - **[DOCUMENTATION_PROJET.md](DOCUMENTATION_PROJET.md)** : Architecture et choix techniques
 - **[../RAPPORT_VERIFICATION.md](../RAPPORT_VERIFICATION.md)** : Rapport de tests et validation
 

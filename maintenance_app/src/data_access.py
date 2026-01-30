@@ -181,3 +181,63 @@ def obtenir_interventions_completes():
         ORDER BY i.date_intervention
     """)
     return [dict(row) for row in cursor.fetchall()]
+
+
+# ========== FONCTIONS D'INSERTION ==========
+def ajouter_technicien(nom, prenom, specialite, email, date_embauche):
+    """Ajoute un nouveau technicien."""
+    conn = obtenir_connexion()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO techniciens (nom, prenom, specialite, email, date_embauche)
+            VALUES (?, ?, ?, ?, ?)
+        """, (nom, prenom, specialite, email, date_embauche))
+        conn.commit()
+        return cursor.lastrowid
+    except Exception as e:
+        conn.rollback()
+        raise e
+
+
+def ajouter_equipement(nom, type_eq, marque, modele, numero_serie, date_acquisition, localisation, statut='actif'):
+    """Ajoute un nouvel équipement."""
+    conn = obtenir_connexion()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO equipements (nom, type, marque, modele, numero_serie, date_acquisition, localisation, statut)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (nom, type_eq, marque, modele, numero_serie, date_acquisition, localisation, statut))
+        conn.commit()
+        return cursor.lastrowid
+    except Exception as e:
+        conn.rollback()
+        raise e
+
+
+def ajouter_intervention(equipement_id, technicien_id, date_intervention, type_intervention,
+                        description, duree_minutes, cout, statut='terminee'):
+    """Ajoute une nouvelle intervention."""
+    conn = obtenir_connexion()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO interventions (equipement_id, technicien_id, date_intervention,
+                                      type_intervention, description, duree_minutes, cout, statut)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (equipement_id, technicien_id, date_intervention, type_intervention,
+              description, duree_minutes, cout, statut))
+        conn.commit()
+        return cursor.lastrowid
+    except Exception as e:
+        conn.rollback()
+        raise e
+
+
+def obtenir_tous_techniciens():
+    """Retourne tous les techniciens."""
+    conn = obtenir_connexion()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM techniciens ORDER BY nom, prenom")
+    return [dict(row) for row in cursor.fetchall()]

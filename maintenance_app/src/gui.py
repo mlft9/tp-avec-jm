@@ -85,6 +85,55 @@ class MaintenanceApp:
         # Separateur
         ttk.Separator(self.sidebar, orient="horizontal").pack(fill=tk.X, padx=15, pady=10)
 
+        # Section GESTION
+        tk.Label(
+            self.sidebar,
+            text="GESTION",
+            font=("Segoe UI", 9, "bold"),
+            fg="#bdc3c7",
+            bg=self.sidebar_color
+        ).pack(anchor="w", padx=15, pady=(5, 0))
+
+        gestion_items = [
+            ("+ Ajouter Intervention", self.add_intervention, "#27ae60"),
+            ("+ Ajouter Technicien", self.add_technicien, "#27ae60"),
+            ("+ Ajouter Equipement", self.add_equipement, "#27ae60"),
+        ]
+
+        for text, command, color in gestion_items:
+            btn = tk.Button(
+                self.sidebar,
+                text=text,
+                font=("Segoe UI", 9, "bold"),
+                fg="white",
+                bg=color,
+                activebackground="#2ecc71",
+                activeforeground="white",
+                bd=0,
+                padx=20,
+                pady=6,
+                anchor="w",
+                cursor="hand2",
+                command=command
+            )
+            btn.pack(fill=tk.X, padx=10, pady=2)
+
+            # Effet hover
+            btn.bind("<Enter>", lambda e, b=btn: b.configure(bg="#2ecc71"))
+            btn.bind("<Leave>", lambda e, b=btn, c=color: b.configure(bg=c))
+
+        # Separateur
+        ttk.Separator(self.sidebar, orient="horizontal").pack(fill=tk.X, padx=15, pady=10)
+
+        # Section ANALYSES
+        tk.Label(
+            self.sidebar,
+            text="ANALYSES",
+            font=("Segoe UI", 9, "bold"),
+            fg="#bdc3c7",
+            bg=self.sidebar_color
+        ).pack(anchor="w", padx=15, pady=(5, 0))
+
         # Boutons de menu
         menu_items = [
             ("Indicateurs globaux", self.show_indicateurs_globaux),
@@ -229,6 +278,12 @@ class MaintenanceApp:
   Utilisez le menu a gauche pour naviguer entre les differentes
   fonctionnalites:
 
+  GESTION (Nouveaux ajouts):
+    + Ajouter Intervention : Creer une nouvelle intervention
+    + Ajouter Technicien : Enregistrer un nouveau technicien
+    + Ajouter Equipement : Ajouter un nouvel equipement au parc
+
+  ANALYSES:
     - Indicateurs globaux : Vue d'ensemble des couts et interventions
     - Equipements sollicites : Les equipements les plus maintenus
     - Frequence par type : Analyse des types d'intervention
@@ -528,6 +583,385 @@ class MaintenanceApp:
         else:
             self._append_text("    Aucune alerte critique\n")
 
+        self._finalize_text()
+
+    def add_technicien(self):
+        """Formulaire d'ajout de technicien."""
+        self._clear_and_set_title("Ajouter un Technicien")
+
+        # Créer une fenêtre de dialogue personnalisée
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Nouveau Technicien")
+        dialog.geometry("400x350")
+        dialog.configure(bg=self.bg_color)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Centrer la fenêtre
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (400 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (350 // 2)
+        dialog.geometry(f'400x350+{x}+{y}')
+
+        # Titre
+        tk.Label(dialog, text="Nouveau Technicien", font=("Segoe UI", 14, "bold"),
+                bg=self.bg_color, fg=self.text_color).pack(pady=15)
+
+        # Frame pour les champs
+        fields_frame = tk.Frame(dialog, bg=self.bg_color)
+        fields_frame.pack(padx=20, pady=10, fill=tk.BOTH, expand=True)
+
+        # Champs
+        fields = {}
+        labels = [
+            ("Nom *", "nom"),
+            ("Prénom *", "prenom"),
+            ("Spécialité *", "specialite"),
+            ("Email *", "email"),
+            ("Date embauche (YYYY-MM-DD) *", "date_embauche")
+        ]
+
+        for i, (label_text, field_name) in enumerate(labels):
+            tk.Label(fields_frame, text=label_text, bg=self.bg_color,
+                    font=("Segoe UI", 9)).grid(row=i, column=0, sticky="w", pady=5)
+
+            entry = tk.Entry(fields_frame, font=("Segoe UI", 10), width=25)
+            entry.grid(row=i, column=1, pady=5, padx=10)
+            fields[field_name] = entry
+
+        # Boutons
+        buttons_frame = tk.Frame(dialog, bg=self.bg_color)
+        buttons_frame.pack(pady=15)
+
+        def save():
+            try:
+                # Validation
+                for field_name, entry in fields.items():
+                    if not entry.get().strip():
+                        messagebox.showerror("Erreur", f"Le champ {field_name} est obligatoire", parent=dialog)
+                        return
+
+                # Validation email
+                email = fields['email'].get().strip()
+                if '@' not in email:
+                    messagebox.showerror("Erreur", "Email invalide", parent=dialog)
+                    return
+
+                # Validation date
+                date_embauche = fields['date_embauche'].get().strip()
+                if len(date_embauche) != 10 or date_embauche[4] != '-' or date_embauche[7] != '-':
+                    messagebox.showerror("Erreur", "Format de date invalide (YYYY-MM-DD)", parent=dialog)
+                    return
+
+                # Insertion
+                technicien_id = data_access.ajouter_technicien(
+                    fields['nom'].get().strip(),
+                    fields['prenom'].get().strip(),
+                    fields['specialite'].get().strip(),
+                    email,
+                    date_embauche
+                )
+
+                messagebox.showinfo("Succès", f"Technicien ajouté avec l'ID {technicien_id}", parent=dialog)
+                dialog.destroy()
+
+                # Rafraîchir l'affichage
+                self._append_text(f"\n✓ Technicien ajouté: {fields['prenom'].get()} {fields['nom'].get()}\n")
+                self._finalize_text()
+
+            except Exception as e:
+                messagebox.showerror("Erreur", f"Erreur lors de l'ajout: {str(e)}", parent=dialog)
+
+        tk.Button(buttons_frame, text="Enregistrer", command=save, bg=self.accent_color,
+                 fg="white", font=("Segoe UI", 10), padx=20, pady=5, cursor="hand2").pack(side=tk.LEFT, padx=5)
+        tk.Button(buttons_frame, text="Annuler", command=dialog.destroy, bg="#95a5a6",
+                 fg="white", font=("Segoe UI", 10), padx=20, pady=5, cursor="hand2").pack(side=tk.LEFT, padx=5)
+
+        self._append_text("\nFormulaire ouvert dans une nouvelle fenêtre...\n")
+        self._finalize_text()
+
+    def add_equipement(self):
+        """Formulaire d'ajout d'équipement."""
+        self._clear_and_set_title("Ajouter un Equipement")
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Nouvel Equipement")
+        dialog.geometry("450x450")
+        dialog.configure(bg=self.bg_color)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Centrer la fenêtre
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (450 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (450 // 2)
+        dialog.geometry(f'450x450+{x}+{y}')
+
+        tk.Label(dialog, text="Nouvel Equipement", font=("Segoe UI", 14, "bold"),
+                bg=self.bg_color, fg=self.text_color).pack(pady=15)
+
+        fields_frame = tk.Frame(dialog, bg=self.bg_color)
+        fields_frame.pack(padx=20, pady=10, fill=tk.BOTH, expand=True)
+
+        fields = {}
+        row = 0
+
+        # Nom
+        tk.Label(fields_frame, text="Nom *", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        fields['nom'] = tk.Entry(fields_frame, font=("Segoe UI", 10), width=25)
+        fields['nom'].grid(row=row, column=1, pady=5, padx=10)
+        row += 1
+
+        # Type (liste déroulante)
+        tk.Label(fields_frame, text="Type *", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        fields['type'] = ttk.Combobox(fields_frame, font=("Segoe UI", 10), width=23,
+                                      values=['ordinateur', 'machine', 'equipement_technique'], state='readonly')
+        fields['type'].grid(row=row, column=1, pady=5, padx=10)
+        fields['type'].current(0)
+        row += 1
+
+        # Marque
+        tk.Label(fields_frame, text="Marque", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        fields['marque'] = tk.Entry(fields_frame, font=("Segoe UI", 10), width=25)
+        fields['marque'].grid(row=row, column=1, pady=5, padx=10)
+        row += 1
+
+        # Modèle
+        tk.Label(fields_frame, text="Modele", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        fields['modele'] = tk.Entry(fields_frame, font=("Segoe UI", 10), width=25)
+        fields['modele'].grid(row=row, column=1, pady=5, padx=10)
+        row += 1
+
+        # Numéro de série
+        tk.Label(fields_frame, text="Numero serie *", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        fields['numero_serie'] = tk.Entry(fields_frame, font=("Segoe UI", 10), width=25)
+        fields['numero_serie'].grid(row=row, column=1, pady=5, padx=10)
+        row += 1
+
+        # Date acquisition
+        tk.Label(fields_frame, text="Date acquisition *\n(YYYY-MM-DD)", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        fields['date_acquisition'] = tk.Entry(fields_frame, font=("Segoe UI", 10), width=25)
+        fields['date_acquisition'].grid(row=row, column=1, pady=5, padx=10)
+        row += 1
+
+        # Localisation
+        tk.Label(fields_frame, text="Localisation *", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        fields['localisation'] = tk.Entry(fields_frame, font=("Segoe UI", 10), width=25)
+        fields['localisation'].grid(row=row, column=1, pady=5, padx=10)
+        row += 1
+
+        # Statut
+        tk.Label(fields_frame, text="Statut *", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        fields['statut'] = ttk.Combobox(fields_frame, font=("Segoe UI", 10), width=23,
+                                       values=['actif', 'en_panne', 'en_maintenance', 'reforme'], state='readonly')
+        fields['statut'].grid(row=row, column=1, pady=5, padx=10)
+        fields['statut'].current(0)
+
+        buttons_frame = tk.Frame(dialog, bg=self.bg_color)
+        buttons_frame.pack(pady=15)
+
+        def save():
+            try:
+                # Validation champs obligatoires
+                required = ['nom', 'numero_serie', 'date_acquisition', 'localisation']
+                for field_name in required:
+                    if not fields[field_name].get().strip():
+                        messagebox.showerror("Erreur", f"Le champ {field_name} est obligatoire", parent=dialog)
+                        return
+
+                # Validation date
+                date_acq = fields['date_acquisition'].get().strip()
+                if len(date_acq) != 10 or date_acq[4] != '-' or date_acq[7] != '-':
+                    messagebox.showerror("Erreur", "Format de date invalide (YYYY-MM-DD)", parent=dialog)
+                    return
+
+                # Insertion
+                equipement_id = data_access.ajouter_equipement(
+                    fields['nom'].get().strip(),
+                    fields['type'].get(),
+                    fields['marque'].get().strip() or None,
+                    fields['modele'].get().strip() or None,
+                    fields['numero_serie'].get().strip(),
+                    date_acq,
+                    fields['localisation'].get().strip(),
+                    fields['statut'].get()
+                )
+
+                messagebox.showinfo("Succès", f"Equipement ajouté avec l'ID {equipement_id}", parent=dialog)
+                dialog.destroy()
+
+                self._append_text(f"\n✓ Equipement ajouté: {fields['nom'].get()}\n")
+                self._finalize_text()
+
+            except Exception as e:
+                messagebox.showerror("Erreur", f"Erreur lors de l'ajout: {str(e)}", parent=dialog)
+
+        tk.Button(buttons_frame, text="Enregistrer", command=save, bg=self.accent_color,
+                 fg="white", font=("Segoe UI", 10), padx=20, pady=5, cursor="hand2").pack(side=tk.LEFT, padx=5)
+        tk.Button(buttons_frame, text="Annuler", command=dialog.destroy, bg="#95a5a6",
+                 fg="white", font=("Segoe UI", 10), padx=20, pady=5, cursor="hand2").pack(side=tk.LEFT, padx=5)
+
+        self._append_text("\nFormulaire ouvert dans une nouvelle fenêtre...\n")
+        self._finalize_text()
+
+    def add_intervention(self):
+        """Formulaire d'ajout d'intervention."""
+        self._clear_and_set_title("Ajouter une Intervention")
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Nouvelle Intervention")
+        dialog.geometry("500x500")
+        dialog.configure(bg=self.bg_color)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Centrer la fenêtre
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (500 // 2)
+        dialog.geometry(f'500x500+{x}+{y}')
+
+        tk.Label(dialog, text="Nouvelle Intervention", font=("Segoe UI", 14, "bold"),
+                bg=self.bg_color, fg=self.text_color).pack(pady=15)
+
+        fields_frame = tk.Frame(dialog, bg=self.bg_color)
+        fields_frame.pack(padx=20, pady=10, fill=tk.BOTH, expand=True)
+
+        fields = {}
+        row = 0
+
+        # Récupérer les équipements et techniciens
+        equipements = data_access.obtenir_tous_equipements()
+        techniciens = data_access.obtenir_tous_techniciens()
+
+        # Equipement (liste déroulante)
+        tk.Label(fields_frame, text="Equipement *", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        equipement_choices = [f"{eq['id']} - {eq['nom']}" for eq in equipements]
+        fields['equipement'] = ttk.Combobox(fields_frame, font=("Segoe UI", 9), width=30,
+                                           values=equipement_choices, state='readonly')
+        fields['equipement'].grid(row=row, column=1, pady=5, padx=10)
+        if equipements:
+            fields['equipement'].current(0)
+        row += 1
+
+        # Technicien (liste déroulante)
+        tk.Label(fields_frame, text="Technicien *", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        technicien_choices = [f"{t['id']} - {t['prenom']} {t['nom']}" for t in techniciens]
+        fields['technicien'] = ttk.Combobox(fields_frame, font=("Segoe UI", 9), width=30,
+                                           values=technicien_choices, state='readonly')
+        fields['technicien'].grid(row=row, column=1, pady=5, padx=10)
+        if techniciens:
+            fields['technicien'].current(0)
+        row += 1
+
+        # Date intervention
+        tk.Label(fields_frame, text="Date *\n(YYYY-MM-DD)", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        fields['date_intervention'] = tk.Entry(fields_frame, font=("Segoe UI", 10), width=32)
+        fields['date_intervention'].grid(row=row, column=1, pady=5, padx=10)
+        # Pré-remplir avec la date du jour
+        from datetime import datetime
+        fields['date_intervention'].insert(0, datetime.now().strftime('%Y-%m-%d'))
+        row += 1
+
+        # Type intervention
+        tk.Label(fields_frame, text="Type *", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        fields['type_intervention'] = ttk.Combobox(fields_frame, font=("Segoe UI", 10), width=30,
+                                                  values=['preventive', 'corrective', 'installation', 'mise_a_jour'], state='readonly')
+        fields['type_intervention'].grid(row=row, column=1, pady=5, padx=10)
+        fields['type_intervention'].current(0)
+        row += 1
+
+        # Description
+        tk.Label(fields_frame, text="Description *", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="nw", pady=5)
+        fields['description'] = tk.Text(fields_frame, font=("Segoe UI", 10), width=32, height=4)
+        fields['description'].grid(row=row, column=1, pady=5, padx=10)
+        row += 1
+
+        # Durée
+        tk.Label(fields_frame, text="Duree (minutes) *", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        fields['duree_minutes'] = tk.Entry(fields_frame, font=("Segoe UI", 10), width=32)
+        fields['duree_minutes'].grid(row=row, column=1, pady=5, padx=10)
+        row += 1
+
+        # Coût
+        tk.Label(fields_frame, text="Cout (EUR) *", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        fields['cout'] = tk.Entry(fields_frame, font=("Segoe UI", 10), width=32)
+        fields['cout'].grid(row=row, column=1, pady=5, padx=10)
+        row += 1
+
+        # Statut
+        tk.Label(fields_frame, text="Statut *", bg=self.bg_color, font=("Segoe UI", 9)).grid(row=row, column=0, sticky="w", pady=5)
+        fields['statut'] = ttk.Combobox(fields_frame, font=("Segoe UI", 10), width=30,
+                                       values=['planifiee', 'en_cours', 'terminee', 'annulee'], state='readonly')
+        fields['statut'].grid(row=row, column=1, pady=5, padx=10)
+        fields['statut'].current(2)  # Par défaut "terminee"
+
+        buttons_frame = tk.Frame(dialog, bg=self.bg_color)
+        buttons_frame.pack(pady=15)
+
+        def save():
+            try:
+                # Validation
+                if not fields['equipement'].get() or not fields['technicien'].get():
+                    messagebox.showerror("Erreur", "Veuillez sélectionner un équipement et un technicien", parent=dialog)
+                    return
+
+                description = fields['description'].get("1.0", tk.END).strip()
+                if not description:
+                    messagebox.showerror("Erreur", "La description est obligatoire", parent=dialog)
+                    return
+
+                duree = fields['duree_minutes'].get().strip()
+                cout = fields['cout'].get().strip()
+
+                if not duree or not cout:
+                    messagebox.showerror("Erreur", "Durée et coût sont obligatoires", parent=dialog)
+                    return
+
+                # Validation numérique
+                try:
+                    duree_int = int(duree)
+                    cout_float = float(cout)
+                    if duree_int <= 0 or cout_float < 0:
+                        raise ValueError()
+                except ValueError:
+                    messagebox.showerror("Erreur", "Durée et coût doivent être des nombres valides", parent=dialog)
+                    return
+
+                # Extraire les IDs
+                equipement_id = int(fields['equipement'].get().split(' - ')[0])
+                technicien_id = int(fields['technicien'].get().split(' - ')[0])
+
+                # Insertion
+                intervention_id = data_access.ajouter_intervention(
+                    equipement_id,
+                    technicien_id,
+                    fields['date_intervention'].get().strip(),
+                    fields['type_intervention'].get(),
+                    description,
+                    duree_int,
+                    cout_float,
+                    fields['statut'].get()
+                )
+
+                messagebox.showinfo("Succès", f"Intervention ajoutée avec l'ID {intervention_id}", parent=dialog)
+                dialog.destroy()
+
+                self._append_text(f"\n✓ Intervention ajoutée (ID: {intervention_id})\n")
+                self._append_text(f"  Equipement: {fields['equipement'].get()}\n")
+                self._append_text(f"  Type: {fields['type_intervention'].get()}\n")
+                self._append_text(f"  Cout: {cout_float} EUR\n")
+                self._finalize_text()
+
+            except Exception as e:
+                messagebox.showerror("Erreur", f"Erreur lors de l'ajout: {str(e)}", parent=dialog)
+
+        tk.Button(buttons_frame, text="Enregistrer", command=save, bg=self.accent_color,
+                 fg="white", font=("Segoe UI", 10), padx=20, pady=5, cursor="hand2").pack(side=tk.LEFT, padx=5)
+        tk.Button(buttons_frame, text="Annuler", command=dialog.destroy, bg="#95a5a6",
+                 fg="white", font=("Segoe UI", 10), padx=20, pady=5, cursor="hand2").pack(side=tk.LEFT, padx=5)
+
+        self._append_text("\nFormulaire ouvert dans une nouvelle fenêtre...\n")
         self._finalize_text()
 
     def quit_app(self):
