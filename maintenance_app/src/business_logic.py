@@ -1,347 +1,234 @@
-"""
-Module de logique métier.
-Contient les calculs et indicateurs métier, incluant des calculs côté Python.
-"""
-
-from typing import Dict, List, Tuple
-from datetime import datetime, timedelta
-from collections import defaultdict
-from data_access import (
-    TechnicienDAO, EquipementDAO, InterventionDAO,
-    StatistiquesDAO, IndicateursDAO
-)
+from datetime import datetime
+import data_access
 
 
-class MaintenanceService:
-    """Service métier pour la gestion de la maintenance."""
+# ========== CALCULS SIMPLES ==========
+def calculer_taux_disponibilite():
+    equipements = data_access.obtenir_tous_equipements()
 
-    # =========================================================================
-    # INDICATEURS SIMPLES (délégués au DAO)
-    # =========================================================================
+    # Compter par type
+    stats_types = {}  # {type: {'total': 0, 'actifs': 0}}
 
-    @staticmethod
-    def get_cout_total_maintenance() -> float:
-        """Retourne le coût total de maintenance."""
-        return StatistiquesDAO.get_cout_total_maintenance()
+    for eq in equipements:
+        type_eq = eq['type']
 
-    @staticmethod
-    def get_nombre_interventions() -> int:
-        """Retourne le nombre total d'interventions."""
-        return StatistiquesDAO.get_nombre_interventions()
+        # Initialiser si pas encore vu
+        if type_eq not in stats_types:
+            stats_types[type_eq] = {'total': 0, 'actifs': 0}
 
-    @staticmethod
-    def get_duree_moyenne_intervention() -> float:
-        """Retourne la durée moyenne des interventions (en minutes)."""
-        return StatistiquesDAO.get_duree_moyenne_intervention()
+        # Compter
+        stats_types[type_eq]['total'] += 1
+        if eq['statut'] == 'actif':
+            stats_types[type_eq]['actifs'] += 1
 
-    @staticmethod
-    def get_equipements_plus_sollicites(limit: int = 5) -> List[Dict]:
-        """Retourne les équipements les plus sollicités."""
-        return IndicateursDAO.get_equipements_plus_sollicites(limit)
+    # Calculer le pourcentage
+    resultats = {}
+    for type_eq, stats in stats_types.items():
+        if stats['total'] > 0:
+            pourcentage = (stats['actifs'] / stats['total']) * 100
+            resultats[type_eq] = round(pourcentage, 2)
 
-    @staticmethod
-    def get_frequence_par_type() -> List[Dict]:
-        """Retourne la fréquence des interventions par type."""
-        return IndicateursDAO.get_frequence_interventions_par_type()
+    return resultats
 
-    # =========================================================================
-    # INDICATEURS CALCULÉS CÔTÉ PYTHON (requis par le projet)
-    # =========================================================================
 
-    @staticmethod
-    def calculer_taux_disponibilite_equipements() -> Dict[str, float]:
-        """
-        Calcule le taux de disponibilité par type d'équipement.
-        INDICATEUR CALCULÉ CÔTÉ PYTHON
+def calculer_indice_fiabilite():
+    equipements = data_access.obtenir_tous_equipements()
+    interventions = data_access.obtenir_interventions_completes()
 
-        Le taux est calculé comme:
-        (Nombre équipements actifs / Nombre total équipements) * 100
-        """
-        equipements = EquipementDAO.get_all()
+    # Regrouper les interventions par équipement
+    interventions_par_equipement = {}
+    for inter in interventions:
+        eq_id = inter['equipement_id']
+        if eq_id not in interventions_par_equipement:
+            interventions_par_equipement[eq_id] = []
+        interventions_par_equipement[eq_id].append(inter)
 
-        if not equipements:
-            return {}
+    resultats = []
+    date_maintenant = datetime.now()
 
-        # Comptage par type et statut côté Python
-        stats_par_type = defaultdict(lambda: {'total': 0, 'actifs': 0})
+    for eq in equipements:
+        eq_id = eq['id']
+        inters = interventions_par_equipement.get(eq_id, [])
 
-        for eq in equipements:
-            type_eq = eq['type']
-            stats_par_type[type_eq]['total'] += 1
-            if eq['statut'] == 'actif':
-                stats_par_type[type_eq]['actifs'] += 1
+        # Compter les pannes (interventions correctives)
+        nb_pannes = 0
+        cout_total = 0
+        for inter in inters:
+            if inter['type_intervention'] == 'corrective':
+                nb_pannes += 1
+            cout_total += inter['cout']
 
-        # Calcul du taux de disponibilité
-        taux = {}
-        for type_eq, stats in stats_par_type.items():
-            if stats['total'] > 0:
-                taux[type_eq] = round((stats['actifs'] / stats['total']) * 100, 2)
+        # Calculer l'âge en années
+        date_acq = datetime.strptime(eq['date_acquisition'], '%Y-%m-%d')
+        age_jours = (date_maintenant - date_acq).days
+        age_annees = age_jours / 365
 
-        return taux
+        # Calculer l'indice (score sur 100)
+        score = 100
 
-    @staticmethod
-    def calculer_mtbf() -> Dict[str, float]:
-        """
-        Calcule le MTBF (Mean Time Between Failures) par équipement.
-        INDICATEUR CALCULÉ CÔTÉ PYTHON
+        # Enlever des points pour chaque panne
+        score -= nb_pannes * 15
 
-        MTBF = Temps total de fonctionnement / Nombre de pannes
-        Ici simplifié: Jours entre première et dernière intervention / Nombre d'interventions correctives
-        """
-        interventions = IndicateursDAO.get_all_interventions_raw()
+        # Enlever des points si coût élevé
+        if cout_total > 500:
+            score -= 10
+        if cout_total > 1000:
+            score -= 10
 
-        if not interventions:
-            return {}
+        # Bonus si équipement récent
+        if age_annees < 2:
+            score += 10
+        # Malus si équipement ancien
+        elif age_annees > 5:
+            score -= 10
 
-        # Grouper les interventions par équipement
-        interventions_par_equipement = defaultdict(list)
-        for inter in interventions:
-            interventions_par_equipement[inter['equipement_nom']].append(inter)
-
-        mtbf_resultats = {}
-
-        for equipement, inters in interventions_par_equipement.items():
-            # Compter les interventions correctives (pannes)
-            correctives = [i for i in inters if i['type_intervention'] == 'corrective']
-            nb_pannes = len(correctives)
-
-            if nb_pannes < 2:
-                # Pas assez de données pour calculer un MTBF significatif
-                mtbf_resultats[equipement] = None
-                continue
-
-            # Calculer la période entre première et dernière intervention
-            dates = [datetime.strptime(i['date_intervention'], '%Y-%m-%d') for i in inters]
-            periode_jours = (max(dates) - min(dates)).days
-
-            if periode_jours > 0:
-                # MTBF en jours
-                mtbf_resultats[equipement] = round(periode_jours / nb_pannes, 1)
-            else:
-                mtbf_resultats[equipement] = None
-
-        return mtbf_resultats
-
-    @staticmethod
-    def calculer_tendance_couts(annee: int = 2024) -> Dict[str, any]:
-        """
-        Analyse la tendance des coûts de maintenance sur l'année.
-        INDICATEUR CALCULÉ CÔTÉ PYTHON
-
-        Retourne: tendance (hausse/baisse/stable), variation en %, détail par mois
-        """
-        interventions = IndicateursDAO.get_all_interventions_raw()
-
-        # Filtrer par année et grouper par mois
-        couts_par_mois = defaultdict(float)
-        for inter in interventions:
-            date_inter = datetime.strptime(inter['date_intervention'], '%Y-%m-%d')
-            if date_inter.year == annee:
-                mois = date_inter.month
-                couts_par_mois[mois] += inter['cout']
-
-        if len(couts_par_mois) < 2:
-            return {
-                'tendance': 'données insuffisantes',
-                'variation_pct': 0,
-                'detail_mois': dict(couts_par_mois)
-            }
-
-        # Calcul de la tendance (comparaison premier/second semestre)
-        s1 = sum(couts_par_mois.get(m, 0) for m in range(1, 7))
-        s2 = sum(couts_par_mois.get(m, 0) for m in range(7, 13))
-
-        if s1 > 0:
-            variation = ((s2 - s1) / s1) * 100
-        else:
-            variation = 100 if s2 > 0 else 0
-
-        if variation > 10:
-            tendance = 'hausse'
-        elif variation < -10:
-            tendance = 'baisse'
-        else:
-            tendance = 'stable'
-
-        return {
-            'tendance': tendance,
-            'variation_pct': round(variation, 2),
-            'cout_s1': round(s1, 2),
-            'cout_s2': round(s2, 2),
-            'detail_mois': {k: round(v, 2) for k, v in sorted(couts_par_mois.items())}
-        }
-
-    @staticmethod
-    def calculer_indice_fiabilite_equipements() -> List[Dict]:
-        """
-        Calcule un indice de fiabilité pour chaque équipement.
-        INDICATEUR CALCULÉ CÔTÉ PYTHON
-
-        Indice basé sur:
-        - Nombre d'interventions correctives (moins = mieux)
-        - Coût moyen par intervention
-        - Âge de l'équipement
-
-        Score de 0 à 100 (100 = très fiable)
-        """
-        equipements = EquipementDAO.get_all()
-        interventions = IndicateursDAO.get_all_interventions_raw()
-
-        # Indexer les interventions par équipement
-        inter_par_eq = defaultdict(list)
-        for inter in interventions:
-            inter_par_eq[inter['equipement_id']].append(inter)
-
-        resultats = []
-        date_reference = datetime.now()
-
-        for eq in equipements:
-            eq_id = eq['id']
-            inters = inter_par_eq.get(eq_id, [])
-
-            # Calcul des métriques
-            nb_correctives = sum(1 for i in inters if i['type_intervention'] == 'corrective')
-            cout_total = sum(i['cout'] for i in inters)
-            nb_interventions = len(inters)
-
-            # Âge en années
-            date_acq = datetime.strptime(eq['date_acquisition'], '%Y-%m-%d')
-            age_jours = (date_reference - date_acq).days
-            age_annees = age_jours / 365
-
-            # Calcul de l'indice (formule métier)
-            # Base 100, pénalités pour pannes et coûts élevés
+        # Garder entre 0 et 100
+        if score < 0:
+            score = 0
+        if score > 100:
             score = 100
 
-            # Pénalité pour interventions correctives (-15 points par panne)
-            score -= nb_correctives * 15
+        resultats.append({
+            'nom': eq['nom'],
+            'type': eq['type'],
+            'age_annees': round(age_annees, 1),
+            'nb_pannes': nb_pannes,
+            'cout_total': round(cout_total, 2),
+            'indice_fiabilite': int(score)
+        })
 
-            # Pénalité pour coût élevé (> 500€ = -10 points par tranche de 500€)
-            score -= (cout_total // 500) * 10
+    # Trier du plus fiable au moins fiable
+    resultats.sort(key=lambda x: x['indice_fiabilite'], reverse=True)
 
-            # Bonus pour équipement récent (< 2 ans = +10)
-            if age_annees < 2:
-                score += 10
-            # Pénalité pour équipement ancien (> 5 ans = -10)
-            elif age_annees > 5:
-                score -= 10
+    return resultats
 
-            # Normaliser entre 0 et 100
-            score = max(0, min(100, score))
 
-            resultats.append({
-                'equipement_id': eq_id,
-                'nom': eq['nom'],
-                'type': eq['type'],
-                'age_annees': round(age_annees, 1),
-                'nb_interventions': nb_interventions,
-                'nb_pannes': nb_correctives,
-                'cout_total': round(cout_total, 2),
-                'indice_fiabilite': int(score)
+def calculer_tendance_couts(annee=2024):
+    interventions = data_access.obtenir_interventions_completes()
+
+    # Regrouper par mois
+    couts_par_mois = {}  # {1: 150.0, 2: 200.0, ...}
+
+    for inter in interventions:
+        date_inter = datetime.strptime(inter['date_intervention'], '%Y-%m-%d')
+
+        if date_inter.year == annee:
+            mois = date_inter.month
+
+            if mois not in couts_par_mois:
+                couts_par_mois[mois] = 0
+
+            couts_par_mois[mois] += inter['cout']
+
+    # Calculer les totaux par semestre
+    cout_s1 = 0  # Mois 1 à 6
+    cout_s2 = 0  # Mois 7 à 12
+
+    for mois in range(1, 7):
+        cout_s1 += couts_par_mois.get(mois, 0)
+
+    for mois in range(7, 13):
+        cout_s2 += couts_par_mois.get(mois, 0)
+
+    # Calculer la variation en %
+    if cout_s1 > 0:
+        variation = ((cout_s2 - cout_s1) / cout_s1) * 100
+    else:
+        variation = 0
+
+    # Déterminer la tendance
+    if variation > 10:
+        tendance = 'hausse'
+    elif variation < -10:
+        tendance = 'baisse'
+    else:
+        tendance = 'stable'
+
+    return {
+        'tendance': tendance,
+        'variation_pct': round(variation, 2),
+        'cout_s1': round(cout_s1, 2),
+        'cout_s2': round(cout_s2, 2),
+        'detail_mois': {k: round(v, 2) for k, v in sorted(couts_par_mois.items())}
+    }
+
+
+def generer_alertes():
+    equipements = data_access.obtenir_tous_equipements()
+    interventions = data_access.obtenir_interventions_completes()
+
+    # Regrouper les interventions par équipement
+    interventions_par_equipement = {}
+    for inter in interventions:
+        eq_id = inter['equipement_id']
+        if eq_id not in interventions_par_equipement:
+            interventions_par_equipement[eq_id] = []
+        interventions_par_equipement[eq_id].append(inter)
+
+    alertes = []
+    date_maintenant = datetime.now()
+
+    for eq in equipements:
+        eq_id = eq['id']
+        inters = interventions_par_equipement.get(eq_id, [])
+
+        if not inters:
+            # Pas d'intervention enregistrée
+            alertes.append({
+                'equipement': eq['nom'],
+                'niveau': 'INFO',
+                'message': "Aucune intervention enregistrée"
+            })
+            continue
+
+        # Compter les pannes
+        nb_pannes = sum(1 for i in inters if i['type_intervention'] == 'corrective')
+
+        if nb_pannes >= 2:
+            alertes.append({
+                'equipement': eq['nom'],
+                'niveau': 'CRITIQUE',
+                'message': f"{nb_pannes} pannes enregistrées - envisager remplacement"
             })
 
-        # Trier par indice de fiabilité (plus fiable en premier)
-        resultats.sort(key=lambda x: x['indice_fiabilite'], reverse=True)
+        # Vérifier le coût total
+        cout_total = sum(i['cout'] for i in inters)
+        if cout_total > 1000:
+            alertes.append({
+                'equipement': eq['nom'],
+                'niveau': 'ATTENTION',
+                'message': f"Coût élevé: {cout_total:.0f}€"
+            })
 
-        return resultats
+        # Dernière intervention
+        dates = [datetime.strptime(i['date_intervention'], '%Y-%m-%d') for i in inters]
+        derniere = max(dates)
+        jours_depuis = (date_maintenant - derniere).days
 
-    @staticmethod
-    def generer_alertes_maintenance() -> List[Dict]:
-        """
-        Génère des alertes pour les équipements nécessitant une attention.
-        INDICATEUR CALCULÉ CÔTÉ PYTHON
+        if jours_depuis > 180:
+            alertes.append({
+                'equipement': eq['nom'],
+                'niveau': 'ATTENTION',
+                'message': f"Pas de maintenance depuis {jours_depuis} jours"
+            })
 
-        Alertes basées sur:
-        - Équipements avec beaucoup de pannes récentes
-        - Équipements sans maintenance depuis longtemps
-        - Coûts anormalement élevés
-        """
-        equipements = EquipementDAO.get_all()
-        interventions = IndicateursDAO.get_all_interventions_raw()
+    # Trier par niveau (CRITIQUE d'abord)
+    ordre = {'CRITIQUE': 0, 'ATTENTION': 1, 'INFO': 2}
+    alertes.sort(key=lambda x: ordre.get(x['niveau'], 3))
 
-        alertes = []
-        date_reference = datetime.now()
+    return alertes
 
-        # Indexer les interventions par équipement
-        inter_par_eq = defaultdict(list)
-        for inter in interventions:
-            inter_par_eq[inter['equipement_id']].append(inter)
 
-        for eq in equipements:
-            eq_id = eq['id']
-            inters = inter_par_eq.get(eq_id, [])
-
-            if not inters:
-                # Alerte: aucune intervention enregistrée
-                alertes.append({
-                    'equipement': eq['nom'],
-                    'niveau': 'INFO',
-                    'message': "Aucune intervention enregistrée - vérifier si maintenance préventive nécessaire"
-                })
-                continue
-
-            # Dernière intervention
-            dates = [datetime.strptime(i['date_intervention'], '%Y-%m-%d') for i in inters]
-            derniere = max(dates)
-            jours_depuis = (date_reference - derniere).days
-
-            # Alerte si pas de maintenance depuis > 180 jours
-            if jours_depuis > 180:
-                alertes.append({
-                    'equipement': eq['nom'],
-                    'niveau': 'ATTENTION',
-                    'message': f"Pas de maintenance depuis {jours_depuis} jours"
-                })
-
-            # Compter les pannes récentes (6 derniers mois)
-            six_mois = date_reference - timedelta(days=180)
-            pannes_recentes = sum(
-                1 for i in inters
-                if i['type_intervention'] == 'corrective'
-                and datetime.strptime(i['date_intervention'], '%Y-%m-%d') >= six_mois
-            )
-
-            if pannes_recentes >= 2:
-                alertes.append({
-                    'equipement': eq['nom'],
-                    'niveau': 'CRITIQUE',
-                    'message': f"{pannes_recentes} pannes sur les 6 derniers mois - envisager remplacement"
-                })
-
-            # Coût total élevé
-            cout_total = sum(i['cout'] for i in inters)
-            if cout_total > 1000:
-                alertes.append({
-                    'equipement': eq['nom'],
-                    'niveau': 'ATTENTION',
-                    'message': f"Coût de maintenance élevé: {cout_total:.2f}€"
-                })
-
-        # Trier par niveau de criticité
-        ordre_niveaux = {'CRITIQUE': 0, 'ATTENTION': 1, 'INFO': 2}
-        alertes.sort(key=lambda x: ordre_niveaux.get(x['niveau'], 3))
-
-        return alertes
-
-    # =========================================================================
-    # RAPPORTS COMPOSITES
-    # =========================================================================
-
-    @staticmethod
-    def generer_rapport_synthese() -> Dict:
-        """
-        Génère un rapport de synthèse complet.
-        Combine indicateurs SQL et calculs Python.
-        """
-        return {
-            'indicateurs_globaux': {
-                'cout_total': MaintenanceService.get_cout_total_maintenance(),
-                'nombre_interventions': MaintenanceService.get_nombre_interventions(),
-                'duree_moyenne_minutes': MaintenanceService.get_duree_moyenne_intervention(),
-            },
-            'taux_disponibilite': MaintenanceService.calculer_taux_disponibilite_equipements(),
-            'tendance_couts': MaintenanceService.calculer_tendance_couts(),
-            'top_equipements_sollicites': MaintenanceService.get_equipements_plus_sollicites(5),
-            'frequence_par_type': MaintenanceService.get_frequence_par_type(),
-            'alertes': MaintenanceService.generer_alertes_maintenance()
-        }
+def generer_rapport_synthese():
+    return {
+        'indicateurs_globaux': {
+            'cout_total': data_access.obtenir_cout_total(),
+            'nombre_interventions': data_access.obtenir_nombre_interventions(),
+            'duree_moyenne_minutes': data_access.obtenir_duree_moyenne(),
+        },
+        'taux_disponibilite': calculer_taux_disponibilite(),
+        'tendance_couts': calculer_tendance_couts(),
+        'top_equipements_sollicites': data_access.obtenir_equipements_sollicites(5),
+        'frequence_par_type': data_access.obtenir_frequence_par_type(),
+        'alertes': generer_alertes()
+    }

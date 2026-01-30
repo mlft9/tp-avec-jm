@@ -1,20 +1,12 @@
-"""
-Module principal - Interface/Déclencheur.
-Affiche les résultats des analyses de maintenance.
-"""
-
 import sys
 from pathlib import Path
 
 # Ajouter le répertoire src au path pour les imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from db_connection import init_database, database_exists, DatabaseConnection
-from data_access import (
-    TechnicienDAO, EquipementDAO, InterventionDAO,
-    StatistiquesDAO, IndicateursDAO
-)
-from business_logic import MaintenanceService
+from db_connection import init_database, database_exists, fermer_connexion
+import data_access
+import business_logic
 
 
 def print_separator(title: str = "", char: str = "=", width: int = 70):
@@ -71,9 +63,9 @@ def afficher_indicateurs_globaux():
     """Affiche les indicateurs globaux."""
     print_separator("INDICATEURS GLOBAUX")
 
-    cout_total = MaintenanceService.get_cout_total_maintenance()
-    nb_interventions = MaintenanceService.get_nombre_interventions()
-    duree_moyenne = MaintenanceService.get_duree_moyenne_intervention()
+    cout_total = data_access.obtenir_cout_total()
+    nb_interventions = data_access.obtenir_nombre_interventions()
+    duree_moyenne = data_access.obtenir_duree_moyenne()
 
     print(f"""
   Coût total de maintenance     : {cout_total:,.2f} €
@@ -86,7 +78,7 @@ def afficher_equipements_sollicites():
     """Affiche les équipements les plus sollicités."""
     print_separator("ÉQUIPEMENTS LES PLUS SOLLICITÉS")
 
-    equipements = MaintenanceService.get_equipements_plus_sollicites(10)
+    equipements = data_access.obtenir_equipements_sollicites(10)
 
     headers = ["Équipement", "Type", "Nb Interv.", "Coût Total", "Durée (min)"]
     rows = [
@@ -101,7 +93,7 @@ def afficher_frequence_par_type():
     """Affiche la fréquence des interventions par type."""
     print_separator("FRÉQUENCE DES INTERVENTIONS PAR TYPE")
 
-    frequences = MaintenanceService.get_frequence_par_type()
+    frequences = data_access.obtenir_frequence_par_type()
 
     headers = ["Type", "Nombre", "Coût Total", "Coût Moyen", "Durée Moy."]
     rows = [
@@ -116,7 +108,7 @@ def afficher_cout_par_type_equipement():
     """Affiche le coût par type d'équipement."""
     print_separator("COÛT DE MAINTENANCE PAR TYPE D'ÉQUIPEMENT")
 
-    couts = IndicateursDAO.get_cout_par_type_equipement()
+    couts = data_access.obtenir_cout_par_type_equipement()
 
     headers = ["Type Équipement", "Nb Équip.", "Nb Interv.", "Coût Total", "Coût Moy."]
     rows = [
@@ -131,7 +123,7 @@ def afficher_taux_disponibilite():
     """Affiche le taux de disponibilité (calculé en Python)."""
     print_separator("TAUX DE DISPONIBILITÉ PAR TYPE (Calcul Python)")
 
-    taux = MaintenanceService.calculer_taux_disponibilite_equipements()
+    taux = business_logic.calculer_taux_disponibilite()
 
     print("\n  [Indicateur calculé côté Python, pas en SQL]")
     print()
@@ -146,7 +138,7 @@ def afficher_indice_fiabilite():
     """Affiche l'indice de fiabilité (calculé en Python)."""
     print_separator("INDICE DE FIABILITÉ DES ÉQUIPEMENTS (Calcul Python)")
 
-    fiabilite = MaintenanceService.calculer_indice_fiabilite_equipements()
+    fiabilite = business_logic.calculer_indice_fiabilite()
 
     print("\n  [Indicateur calculé côté Python: score basé sur pannes, coûts et âge]")
     print()
@@ -164,7 +156,7 @@ def afficher_tendance_couts():
     """Affiche la tendance des coûts (calculée en Python)."""
     print_separator("TENDANCE DES COÛTS 2024 (Calcul Python)")
 
-    tendance = MaintenanceService.calculer_tendance_couts(2024)
+    tendance = business_logic.calculer_tendance_couts(2024)
 
     print("\n  [Indicateur calculé côté Python: analyse semestrielle]")
     print(f"""
@@ -188,7 +180,7 @@ def afficher_alertes():
     """Affiche les alertes de maintenance (calculées en Python)."""
     print_separator("ALERTES DE MAINTENANCE (Calcul Python)")
 
-    alertes = MaintenanceService.generer_alertes_maintenance()
+    alertes = business_logic.generer_alertes()
 
     print("\n  [Alertes générées par analyse Python des données]")
     print()
@@ -212,7 +204,7 @@ def afficher_interventions_par_mois():
     """Affiche les interventions par mois."""
     print_separator("INTERVENTIONS PAR MOIS (2024)")
 
-    interventions = IndicateursDAO.get_interventions_par_mois(2024)
+    interventions = data_access.obtenir_interventions_par_mois(2024)
 
     noms_mois = {
         '01': 'Janvier', '02': 'Février', '03': 'Mars', '04': 'Avril',
@@ -233,7 +225,7 @@ def afficher_performance_techniciens():
     """Affiche la performance des techniciens."""
     print_separator("PERFORMANCE DES TECHNICIENS")
 
-    perf = IndicateursDAO.get_performance_techniciens()
+    perf = data_access.obtenir_performance_techniciens()
 
     headers = ["Technicien", "Spécialité", "Nb Interv.", "Temps Total", "Valeur"]
     rows = [
@@ -249,7 +241,7 @@ def afficher_historique_equipement():
     print_separator("HISTORIQUE D'UN ÉQUIPEMENT")
 
     # Lister les équipements disponibles
-    equipements = EquipementDAO.get_all()
+    equipements = data_access.obtenir_tous_equipements()
     print("\n  Équipements disponibles:")
     for eq in equipements:
         print(f"    {eq['id']:2}. {eq['nom']} ({eq['type']})")
@@ -261,7 +253,7 @@ def afficher_historique_equipement():
         if eq_id == 0:
             return
 
-        equipement = EquipementDAO.get_by_id(eq_id)
+        equipement = data_access.obtenir_equipement_par_id(eq_id)
         if not equipement:
             print("  Équipement non trouvé")
             return
@@ -270,7 +262,7 @@ def afficher_historique_equipement():
         print(f"  Type: {equipement['type']} | Localisation: {equipement['localisation']}")
         print(f"  Statut actuel: {equipement['statut']}")
 
-        historique = IndicateursDAO.get_historique_equipement(eq_id)
+        historique = data_access.obtenir_historique_equipement(eq_id)
 
         if historique:
             headers = ["Date", "Type", "Description", "Durée", "Coût", "Technicien"]
@@ -293,7 +285,7 @@ def afficher_rapport_synthese():
     """Affiche le rapport de synthèse complet."""
     print_separator("RAPPORT DE SYNTHÈSE COMPLET", "=", 70)
 
-    rapport = MaintenanceService.generer_rapport_synthese()
+    rapport = business_logic.generer_rapport_synthese()
 
     # Indicateurs globaux
     print("\n  INDICATEURS GLOBAUX")
@@ -357,7 +349,7 @@ def main():
 
             if choix == '0':
                 print("\n  Au revoir!")
-                DatabaseConnection().close()
+                fermer_connexion()
                 break
             elif choix == '1':
                 afficher_indicateurs_globaux()
@@ -390,7 +382,7 @@ def main():
 
         except KeyboardInterrupt:
             print("\n\n  Interruption. Au revoir!")
-            DatabaseConnection().close()
+            fermer_connexion()
             break
         except Exception as e:
             print(f"\n  Erreur: {e}")
