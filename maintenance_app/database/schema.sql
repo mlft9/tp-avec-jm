@@ -1,15 +1,7 @@
--- ============================================================================
--- SCHEMA DE LA BASE DE DONNEES - SUIVI DE MAINTENANCE DE MATERIEL
--- ============================================================================
-
 -- Suppression des tables existantes (ordre inverse des dépendances)
 DROP TABLE IF EXISTS interventions;
 DROP TABLE IF EXISTS equipements;
 DROP TABLE IF EXISTS techniciens;
-
--- ============================================================================
--- CREATION DES TABLES
--- ============================================================================
 
 -- Table des techniciens
 CREATE TABLE techniciens (
@@ -55,9 +47,7 @@ CREATE INDEX idx_interventions_technicien ON interventions(technicien_id);
 CREATE INDEX idx_interventions_date ON interventions(date_intervention);
 CREATE INDEX idx_equipements_type ON equipements(type);
 
--- ============================================================================
--- INSERTION DES DONNEES DE TEST
--- ============================================================================
+
 
 -- Insertion des techniciens (5 techniciens)
 INSERT INTO techniciens (nom, prenom, specialite, email, date_embauche) VALUES
