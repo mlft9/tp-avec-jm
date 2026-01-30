@@ -1,9 +1,9 @@
 from db_connection import obtenir_connexion
 
 
-# ========== FONCTIONS DE BASE ==========
+# FONCTIONS DE BASE 
 def obtenir_tous_equipements():
-    """Retourne tous les équipements."""
+    #Retourne tous les équipements
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM equipements ORDER BY nom")
@@ -11,7 +11,7 @@ def obtenir_tous_equipements():
 
 
 def obtenir_equipement_par_id(equipement_id):
-    """Retourne un équipement par son ID."""
+    #Retourne un équipement par son ID
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM equipements WHERE id = ?", (equipement_id,))
@@ -20,16 +20,16 @@ def obtenir_equipement_par_id(equipement_id):
 
 
 def obtenir_toutes_interventions():
-    """Retourne toutes les interventions."""
+    #Retourne toutes les interventions
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM interventions ORDER BY date_intervention DESC")
     return [dict(row) for row in cursor.fetchall()]
 
 
-# ========== STATISTIQUES SIMPLES ==========
+# STATISTIQUES SIMPLES 
 def obtenir_cout_total():
-    """Calcule le coût total de maintenance."""
+    #Calcule le coût total de maintenance
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("SELECT SUM(cout) as total FROM interventions WHERE statut = 'terminee'")
@@ -38,7 +38,7 @@ def obtenir_cout_total():
 
 
 def obtenir_nombre_interventions():
-    """Compte le nombre total d'interventions."""
+    #Compte le nombre total d'interventions
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) as count FROM interventions")
@@ -46,7 +46,7 @@ def obtenir_nombre_interventions():
 
 
 def obtenir_duree_moyenne():
-    """Calcule la durée moyenne des interventions."""
+    #Calcule la durée moyenne des interventions
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("SELECT AVG(duree_minutes) as moyenne FROM interventions WHERE statut = 'terminee'")
@@ -54,9 +54,9 @@ def obtenir_duree_moyenne():
     return round(result['moyenne'], 2) if result['moyenne'] else 0.0
 
 
-# ========== STATISTIQUES AVANCÉES ==========
+# STATISTIQUES AVANCÉES 
 def obtenir_equipements_sollicites(limit=5):
-    """Retourne les équipements avec le plus d'interventions."""
+    #Retourne les équipements avec le plus d'interventions
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("""
@@ -75,7 +75,7 @@ def obtenir_equipements_sollicites(limit=5):
 
 
 def obtenir_frequence_par_type():
-    """Nombre d'interventions par type."""
+    #Nombre d'interventions par type
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("""
@@ -93,7 +93,7 @@ def obtenir_frequence_par_type():
 
 
 def obtenir_cout_par_type_equipement():
-    """Coût de maintenance par type d'équipement."""
+    #Coût de maintenance par type d'équipement
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("""
@@ -111,7 +111,7 @@ def obtenir_cout_par_type_equipement():
 
 
 def obtenir_interventions_par_mois(annee):
-    """Interventions groupées par mois pour une année."""
+    #Interventions groupées par mois pour une année
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("""
@@ -129,7 +129,7 @@ def obtenir_interventions_par_mois(annee):
 
 
 def obtenir_performance_techniciens():
-    """Performance des techniciens."""
+    #Performance des techniciens
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("""
@@ -148,7 +148,7 @@ def obtenir_performance_techniciens():
 
 
 def obtenir_historique_equipement(equipement_id):
-    """Historique complet d'un équipement."""
+    #Historique complet d'un équipement
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("""
@@ -168,7 +168,7 @@ def obtenir_historique_equipement(equipement_id):
 
 
 def obtenir_interventions_completes():
-    """Toutes les interventions avec détails (pour les calculs Python)."""
+    #Toutes les interventions avec détails (pour les calculs Python).
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("""
@@ -183,9 +183,9 @@ def obtenir_interventions_completes():
     return [dict(row) for row in cursor.fetchall()]
 
 
-# ========== FONCTIONS D'INSERTION ==========
+# FONCTIONS D'INSERTION 
 def ajouter_technicien(nom, prenom, specialite, email, date_embauche):
-    """Ajoute un nouveau technicien."""
+    #Ajoute un nouveau technicien
     conn = obtenir_connexion()
     cursor = conn.cursor()
     try:
@@ -201,7 +201,7 @@ def ajouter_technicien(nom, prenom, specialite, email, date_embauche):
 
 
 def ajouter_equipement(nom, type_eq, marque, modele, numero_serie, date_acquisition, localisation, statut='actif'):
-    """Ajoute un nouvel équipement."""
+    #Ajoute un nouvel équipement
     conn = obtenir_connexion()
     cursor = conn.cursor()
     try:
@@ -218,7 +218,7 @@ def ajouter_equipement(nom, type_eq, marque, modele, numero_serie, date_acquisit
 
 def ajouter_intervention(equipement_id, technicien_id, date_intervention, type_intervention,
                         description, duree_minutes, cout, statut='terminee'):
-    """Ajoute une nouvelle intervention."""
+    #Ajoute une nouvelle intervention
     conn = obtenir_connexion()
     cursor = conn.cursor()
     try:
@@ -236,7 +236,7 @@ def ajouter_intervention(equipement_id, technicien_id, date_intervention, type_i
 
 
 def obtenir_tous_techniciens():
-    """Retourne tous les techniciens."""
+    #Retourne tous les techniciens
     conn = obtenir_connexion()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM techniciens ORDER BY nom, prenom")
